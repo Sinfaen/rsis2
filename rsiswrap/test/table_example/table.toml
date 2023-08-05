@@ -1,0 +1,14 @@
+# example of a table containing parameters
+# to be used by multiple models
+name = "vehicleParameters"
+
+[state]
+position = {type="f64", dims=[3], value=[0,0,0]}
+velocity = {type="f64", dims=[3], value=[0,0,0]}
+attitude = {type="f64", dims=[4], value=[1,0,0,0]}
+
+# main table
+[table]
+dry_mass = {type="f32", value="10.0"}
+num_pods = {type="i32", value=3}
+tracked  = {struct="state", dims=[10]}

@@ -1,0 +1,7 @@
+[rsisproject]
+name = "all_data_types"
+desc = "Model exercising all interface structures supported by RSIS"
+version = "0.0.1"
+
+[scenes]
+base = "scenes/base.toml"
