@@ -34,17 +34,12 @@ function render_to_buffer(data::Dict, io::IOBuffer)
     use std::collections::HashMap;
     use nalgebra::SMatrix;
     use std::ffi::c_void;
+    use rmp_serde::encode::Error;
 
     use crate::$(intf_name)::*;
 
     extern crate rmodel;
     use rmodel::*;
-
-    pub struct cbuf {
-        pub len : i32,
-        pub buf : *const u8,
-    }
-
     """)
 
     # write out the decoding
@@ -92,6 +87,54 @@ function render_to_buffer(data::Dict, io::IOBuffer)
         write(io,
         """
                 _ => return 2,
+            }
+        }
+        """)
+    end
+
+    # write out the encoding
+    for (key, val) in data["ctxt"].structinfo
+        write(io,
+        """
+        pub fn $(key)_to_msgpack(obj: &mut $(key), ind: &[i32]) -> Result<Vec<u8>, Error> {
+            if ind.len() == 0 { return Err(Error::Syntax("RSIS > index length is 0".to_string())); }
+            match ind[0] {
+        """)
+        ind = 0
+        for skey in val.fields
+            if skey.type in keys(_typeconvert) || !isempty(skey.dict_info)
+                # primitive
+                if length(skey.dimension) > 1
+                    # SMatrix
+        write(io,
+        """
+                $(ind) => {
+                    rmp_serde::to_vec(&obj.$(skey.name))
+                }
+        """)
+                else
+                    # regular primitive
+        write(io,
+        """
+                $(ind) => {
+                    rmp_serde::to_vec(&obj.$(skey.name))
+                },
+        """)
+                end
+            else
+                # user defined type
+        write(io,
+        """
+                $(ind) => {
+                    $(skey.type)_to_msgpack(&mut obj.$(skey.name), &ind[1..])
+                },
+        """)
+            end
+            ind = ind + 1
+        end
+        write(io,
+        """
+                _ => return Err(Error::Syntax("RSIS > index exceeded length".to_string())),
             }
         }
         """)

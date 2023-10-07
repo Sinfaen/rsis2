@@ -55,7 +55,7 @@ function render_to_buffer(data::Dict, io::IOBuffer)
     use std::collections::HashMap;
     use num_complex::Complex32;
     use num_complex::Complex64;
-    use nalgebra::{Matrix, SMatrix, ArrayStorage};
+    use nalgebra::{SMatrix};
     use nalgebra::dimension::Const;
 
     """)

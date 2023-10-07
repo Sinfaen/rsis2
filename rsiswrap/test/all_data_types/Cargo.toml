@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 num-complex = {version="0.4.3", features=["serde"]}
-nalgebra = "0.32.3"
+nalgebra = {version="0.32.3", features=["serde-serialize"]}
 rmodel = { path = "../../../rmodel" }
 rmp = { version="0.8.12", optional=true}
 rmp-serde = { version="1.1.2", optional=true}
