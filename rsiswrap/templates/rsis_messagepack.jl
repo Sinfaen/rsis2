@@ -140,8 +140,10 @@ function render_to_buffer(data::Dict, io::IOBuffer)
         """)
     end
 
+    # write metadata documentation interface
+
     # write out the constructor and box function
-    root = data["ctxt"].root
+    root = data["ctxt"].name
     write(io,
     """
     impl $(root) {

@@ -46,14 +46,9 @@ mutable struct Context
     definedstructs :: Set{String}
     structinfo :: Dict{String, RsisStruct}
     name :: String
-    root :: String
-    in :: String
-    out :: String
-    data :: String
-    param :: String
-
+    tags :: Dict{String, String}
     function Context()
-        new(Set{String}(), Dict{String, RsisStruct}(), "", "", "", "", "", "")
+        new(Set{String}(), Dict{String, RsisStruct}(), "", Dict{String, String}())
     end
 end
 
@@ -184,10 +179,13 @@ function parse_value(data :: Any, etype :: DataType, dims :: Tuple) :: Any
     end
 end
 
-function parse_field(ctxt :: Context, str :: RsisStruct, name :: String, data :: Dict)
-    if !haskey(data, "type")
-        throw(ErrorException("Field does not define a type"))
+function parse_field(ctxt :: Context, str :: RsisStruct, data :: Dict)
+    for key = ["name", "type"]
+        if !haskey(data, key)
+            throw(ErrorException("Field does not define $(key)"))
+        end
     end
+    name = data["name"]
     # optional dimension handling
     if haskey(data, "dims")
         for d in data["dims"]
@@ -223,14 +221,27 @@ function parse_field(ctxt :: Context, str :: RsisStruct, name :: String, data ::
     end
     # optional units. TODO unitful integration
     units = get(data, "units", "")
+
+    # tag handling
+    if haskey(data, "tag")
+        tagname = data["tag"]
+        if haskey(ctxt.tags, tagname)
+            throw(ErrorException("Struct $(name) is tagged with [$(tagname)] but $(ctxt.tags[tagname]) is already marked"))
+        end
+        ctxt.tags[tagname] = name
+    end
+
     push!(str.fields, Port(name, data["type"], Tuple(dims), units, default))
 end
 
 function parse_struct(ctxt :: Context, name::String, desc::String, data :: Dict)
     tbl = RsisStruct(name, desc)
-    for (key, value) in data
+    if !haskey(data, "fields")
+        throw(ErrorException("`fields` key not found in [$(name)]"))
+    end
+    for dat in data["fields"]
         # field parsing
-        parse_field(ctxt, tbl, key, value)
+        parse_field(ctxt, tbl, dat)
     end
     ctxt.structinfo[name] = tbl
 end
@@ -246,15 +257,20 @@ function parse_idl(input_file :: String) :: Context
     data = TOML.parsefile(input_file)
 
     # search for required keys
-    for key = ["name", "desc", "root", "types"]
+    for key = ["root", "types"]
         if !haskey(data, key)
             throw(ErrorException("$(input_file) does not define root level $(key)"))
         end
     end
+    root = data["root"]
+    for key = ["name", "desc"]
+        if !haskey(root, key)
+            throw(ErrorException("$(input_file):[root] does not define required key: [$(key)]"))
+        end
+    end
 
     context = Context()
-    context.name = data["name"]
-    context.root = data["root"]
+    context.name = root["name"]
 
     # get a full list of just the defined types ahead of time
     structdefines = data["types"]
@@ -271,12 +287,6 @@ function parse_idl(input_file :: String) :: Context
         if value isa Dict
             parse_struct(context, key, "", value)
         end
-    end
-
-    # check that the root value exists
-    root = data["root"]
-    if !(root in keys(structdefines))
-        throw(ErrorException("Root level struct $(root) is not defined"))
     end
 
     return context
