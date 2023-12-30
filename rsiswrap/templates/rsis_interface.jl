@@ -62,8 +62,9 @@ function render_to_buffer(data::Dict, io::IOBuffer)
 
     # write out the struct definitions
     for (key, val) in data["ctxt"].structinfo
-        write(io, "#[derive(Default)]\n")
-        write(io, "pub struct $(key) {\n")
+        write(io, "#[derive(Default, Clone)]\n")
+        generictxt = length(val.generics) > 0 ? "<" * join(keys(val.generics), ",") * ">" : ""
+        write(io, "pub struct $(key)$(generictxt) {\n")
         for skey in val.fields
             if isempty(skey.dict_info)
                 if skey.type in keys(_typeconvert)
@@ -71,7 +72,7 @@ function render_to_buffer(data::Dict, io::IOBuffer)
                     rtype = _typeconvert[skey.type]
                 else
                     # user defined type
-                    rtype = skey.type
+                    rtype = replace(skey.type, "{" => "<", "}" => ">")
                 end
             else
                 rtype = "HashMap<$(_typeconvert[skey.dict_info[1]]),$(_typeconvert[skey.dict_info[2]])>"

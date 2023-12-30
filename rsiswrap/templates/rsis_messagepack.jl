@@ -31,28 +31,58 @@ function render_to_buffer(data::Dict, io::IOBuffer)
     extern crate nalgebra;
     extern crate rmp;
     extern crate rmp_serde;
+    extern crate serde;
+    extern crate rmodel;
     use std::collections::HashMap;
     use nalgebra::SMatrix;
-    use std::ffi::c_void;
     use rmp_serde::encode::Error;
 
     use crate::$(intf_name)::*;
-
-    extern crate rmodel;
-    use rmodel::*;
+    use serde::{Deserialize, Serialize};
     """)
 
     # write out the decoding
     for (key, val) in data["ctxt"].structinfo
+        is_generic = length(val.generics) > 0
+        # expands to <T, N, ...> in generic case, empty otherwise
+        if is_generic
+            generic_txt  = "<" * join(keys(val.generics), ",") * ": for <'a> Deserialize<'a>>"
+            generic_txt2 = "<" * join(keys(val.generics), ",") * ">"
+        else
+            generic_txt  = ""
+            generic_txt2 = ""
+        end
         write(io,
         """
-        pub fn $(key)_from_msgpack(obj: &mut $(key), mp: &[u8], ind: &[i32]) -> i32 {
+        pub fn $(key)_from_msgpack$(generic_txt)(obj: &mut $(key)$(generic_txt2), mp: &[u8], ind: &[i32]) -> i32 {
             if ind.len() == 0 { return 1; }
             match ind[0] {
         """)
         ind = 0
         for skey in val.fields
-            if skey.type in keys(_typeconvert) || !isempty(skey.dict_info)
+            if skey.is_generic
+                if length(skey.dimension) > 1
+                    # SMatrix
+        write(io,
+        """
+                $(ind) => {
+                    let data : Vec<$(_typeconvert[skey.type])> = rmp_serde::from_slice(mp).unwrap();
+                    if data.len() != $(prod(skey.dimension)) { return 1; }
+                    obj.$(skey.name) = SMatrix::from_vec(data);
+                    return 0;
+        }
+        """)
+                else
+                    # simple generic
+        write(io,
+        """
+                $(ind) => {
+                    obj.$(skey.name) = rmp_serde::from_slice(mp).unwrap();
+                    return 0;
+                },
+        """)
+                end
+            elseif skey.type in keys(_typeconvert) || !isempty(skey.dict_info)
                 # primitive
                 if length(skey.dimension) > 1
                     # SMatrix
@@ -79,7 +109,7 @@ function render_to_buffer(data::Dict, io::IOBuffer)
                 # user defined type
         write(io,
         """
-                $(ind) => return $(skey.type)_from_msgpack(&mut obj.$(skey.name), mp, &ind[1..]),
+                $(ind) => return $(skey.base_type)_from_msgpack(&mut obj.$(skey.name), mp, &ind[1..]),
         """)
             end
             ind = ind + 1
@@ -94,39 +124,44 @@ function render_to_buffer(data::Dict, io::IOBuffer)
 
     # write out the encoding
     for (key, val) in data["ctxt"].structinfo
+        is_generic = length(val.generics) > 0
+        # expands to <T, N, ...> in generic case, empty otherwise
+        if is_generic
+            generic_txt  = "<" * join(keys(val.generics), ",") * ": for <'a> Deserialize<'a> + Serialize>"
+            generic_txt2 = "<" * join(keys(val.generics), ",") * ">"
+        else
+            generic_txt  = ""
+            generic_txt2 = ""
+        end
         write(io,
         """
-        pub fn $(key)_to_msgpack(obj: &mut $(key), ind: &[i32]) -> Result<Vec<u8>, Error> {
+        pub fn $(key)_to_msgpack$(generic_txt)(obj: &mut $(key)$(generic_txt2), ind: &[i32]) -> Result<Vec<u8>, Error> {
             if ind.len() == 0 { return Err(Error::Syntax("RSIS > index length is 0".to_string())); }
             match ind[0] {
         """)
         ind = 0
         for skey in val.fields
-            if skey.type in keys(_typeconvert) || !isempty(skey.dict_info)
-                # primitive
-                if length(skey.dimension) > 1
-                    # SMatrix
+            if skey.is_generic
         write(io,
         """
                 $(ind) => {
                     rmp_serde::to_vec(&obj.$(skey.name))
                 }
         """)
-                else
-                    # regular primitive
+            elseif skey.type in keys(_typeconvert) || !isempty(skey.dict_info)
+                # primitive
         write(io,
         """
                 $(ind) => {
                     rmp_serde::to_vec(&obj.$(skey.name))
                 },
         """)
-                end
             else
                 # user defined type
         write(io,
         """
                 $(ind) => {
-                    $(skey.type)_to_msgpack(&mut obj.$(skey.name), &ind[1..])
+                    $(skey.base_type)_to_msgpack(&mut obj.$(skey.name), &ind[1..])
                 },
         """)
             end
@@ -140,22 +175,30 @@ function render_to_buffer(data::Dict, io::IOBuffer)
         """)
     end
 
-    # write metadata documentation interface
-
     # write out the constructor and box function
     root = data["ctxt"].name
+    rootobj = data["ctxt"].structinfo[root]
+    is_generic = length(rootobj.generics) > 0
+    # expands to <T, N, ...> in generic case, empty otherwise
+        if is_generic
+            generic_txt  = "<" * join(keys(rootobj.generics), ",") * ": std::default::Default>"
+            generic_txt2 = "<" * join(keys(rootobj.generics), ",") * ">"
+        else
+            generic_txt  = ""
+            generic_txt2 = ""
+        end
     write(io,
     """
-    impl $(root) {
+    impl$(generic_txt) $(root)$(generic_txt2) {
         pub fn new() -> Self {
             Default::default()
         }
     }
 
-    #[no_mangle]
-    pub extern "C" fn $(root)_new() -> *mut c_void {
-        let obj : Box<Box<dyn RModel + Send>> = Box::new(Box::new($(root)::new()));
-        Box::into_raw(obj) as *mut Box<dyn RModel + Send> as *mut c_void
-    }
+    //#[no_mangle]
+    //pub extern "C" fn $(root)_new() -> *mut c_void {
+    //    let obj : Box<Box<dyn RModel + Send>> = Box::new(Box::new($(root)::new()));
+    //    Box::into_raw(obj) as *mut Box<dyn RModel + Send> as *mut c_void
+    //}
     """)
 end

@@ -3,43 +3,71 @@ module rsiswrap
 using Logging
 using TOML
 
+"""
+represents a single field within a rust struct
+"""
 struct Port
     name :: String
     type :: String # Julia type
+    base_type :: String # Julia type, stripped of generics
     dimension :: Tuple # empty if scalar, contains dimensions otherwise
     units :: Any
     default :: Any
     
+    # quick access for templates
     dict_info :: Tuple # empty if not, contains two types if true
     is_scalar :: Bool
     is_vector :: Bool
     is_arr1 :: Bool
+    is_user_struct :: Bool
+    is_generic :: Bool
 
-    function Port(name::String, type::String, dimension::Tuple, units::Any, default::Any)
-
-        # this is not a scalar/array type, assuming a Dict
-        reg = r"^Dict{(.*),(.*)}$"
-        if occursin(reg, type)
-            m = match(reg, type)
-            is_dict = (m[1], m[2])
-        else
-            is_dict = ()
+    function Port(name::String, type::String, dimension::Tuple, units::Any, default::Any, is_user::Bool, is_gtype::Bool)
+        toks = _type_tokens(type)
+        base_type = toks[1]
+        is_dict = ()
+        if length(toks) > 1 # generic struct or Dict
+            # only handles 1 generic
+            if base_type == "Dict"
+                if length(toks) != 3
+                    throw(ErrorException("Unable to parse $(type) as a dictionary"))
+                end
+                is_dict = (toks[2], toks[3])
+            end
         end
         is_scalar = isempty(dimension)
         is_vec = (dimension == (-1,))
         is_arr1 = length(dimension) == 1 && !is_vec
-        new(name, type, dimension, units, default, is_dict, is_scalar, is_vec, is_arr1)
+        new(name, type, base_type, dimension, units, default, is_dict, is_scalar, is_vec, is_arr1, is_user, is_gtype)
     end
 end
 
+"""
+represents <T> in a rust generic
+"""
+struct GenericType
+    options :: Vector{String} # all allowed rsis types
+    default :: String         # default type out of allowed
+end
+
+"""
+represents a rust struct
+"""
 mutable struct RsisStruct
     name :: String
     desc :: String
     fields :: Vector{Port}
 
+    # map type name, e.g. `T` to the struct
+    generics :: Dict{String, GenericType}
+
     function RsisStruct(name :: String, desc :: String)
-        new(name, desc, Vector{Port}())
+        new(name, desc, Vector{Port}(), Dict{String, GenericType}())
     end
+end
+
+function is_generic(obj::RsisStruct) :: Bool
+    return length(obj.generics) > 0
 end
 
 mutable struct Context
@@ -78,6 +106,15 @@ _primitive_types = Dict{String, DataType}([
     "ComplexF32" => ComplexF32,
     "ComplexF64" => ComplexF64,
 ])
+
+"""
+Splits typenames into tokens. If only 1 element, regular type.
+If multiple, generic is detected
+"""
+function _type_tokens(txt::String) :: Vector{String}
+    tokens = split(txt, r"[\{,\}]")
+    return [strip(t) for t in tokens if !isempty(t)]
+end
 
 function rsis_primitive_type(type :: String) :: DataType
     global _primitive_types
@@ -201,22 +238,43 @@ function parse_field(ctxt :: Context, str :: RsisStruct, data :: Dict)
         dims = ()
     end
     # type handling. needs the dimensional information here
-    if data["type"] in ctxt.definedstructs
-        default = nothing # user defined struct
-    else # regular value
-        etype = rsis_primitive_type(data["type"])
-        if etype == Nothing
-            throw(ErrorException("Failed to recognize: $(data["type"])"))
+    toks = _type_tokens(data["type"])
+    is_generic = length(toks) > 1
+    base_type = toks[1]
+    if is_generic
+        if base_type in ctxt.definedstructs
+            default = nothing # user defined generic struct
+        elseif base_type == "Dict"
+            etype = rsis_primitive_type(data["type"])
+            default = haskey(data, "value") ? data["value"] : Dict()
+        else
+            throw(ErrorException("Unable to identify $(base_type) as target for generic"))
         end
-        # default value. this is tricky.
-        if !haskey(data, "value")
-            throw(ErrorException("Missing `value`"))
-        end
-        try
-            default = parse_value(data["value"], etype, dims)
-        catch e
-            @error "Failed to parse value for [$(name)]"
-            throw(e)
+    else
+        if base_type in ctxt.definedstructs
+            default = nothing # user defined struct
+        elseif haskey(str.generics, base_type)
+            etype = rsis_primitive_type("failure")
+            # we have to let the rust compiler figure out if this is valid
+            if !haskey(data, "value")
+                throw(ErrorException("Missing `value`"))
+            end
+            default = data["value"]
+        else
+            # regular value
+            etype = rsis_primitive_type(base_type)
+            if !haskey(data, "value")
+                throw(ErrorException("Missing `value`"))
+            end
+            try
+                default = parse_value(data["value"], etype, dims)
+            catch e
+                @error "Failed to parse value for [$(name)]"
+                throw(e)
+            end
+            if etype == Nothing
+                throw(ErrorException("Failed to recognize: $(data["type"])"))
+            end
         end
     end
     # optional units. TODO unitful integration
@@ -231,13 +289,35 @@ function parse_field(ctxt :: Context, str :: RsisStruct, data :: Dict)
         ctxt.tags[tagname] = name
     end
 
-    push!(str.fields, Port(name, data["type"], Tuple(dims), units, default))
+    push!(str.fields, Port(name, data["type"], Tuple(dims), units, default, base_type in ctxt.definedstructs, haskey(str.generics, base_type)))
+end
+
+function parse_generic(ctxt :: Context, str::RsisStruct, data::Dict)
+    for val in ["name", "default"]
+        if !haskey(data, val)
+            throw(ErrorException("Missing `$(val)` key in generic definition"))
+        end
+        if !isa(data[val], String)
+            throw(ErrorException("Generic `$(val)` must be a string"))
+        end
+    end
+    name = data["name"]
+    opts = haskey(data, "options") ? data["options"] : Vector{String}()
+    str.generics[name] = GenericType(opts, data["default"])
 end
 
 function parse_struct(ctxt :: Context, name::String, desc::String, data :: Dict)
     tbl = RsisStruct(name, desc)
     if !haskey(data, "fields")
         throw(ErrorException("`fields` key not found in [$(name)]"))
+    end
+    if haskey(data, "generic")
+        if !isa(data["generic"], AbstractArray)
+            throw(ErrorException("`generic` key is not an array"))
+        end
+        for obj in data["generic"]
+            parse_generic(ctxt, tbl, obj)
+        end
     end
     for dat in data["fields"]
         # field parsing
@@ -246,6 +326,11 @@ function parse_struct(ctxt :: Context, name::String, desc::String, data :: Dict)
     ctxt.structinfo[name] = tbl
 end
 
+"""
+Parses an IDL and returns a RSISContext
+
+Generic specialization specified with `gen_spec` will be applied.
+"""
 function parse_idl(input_file :: String) :: Context
     if !isabspath(input_file)
         input_file = abspath(input_file)
