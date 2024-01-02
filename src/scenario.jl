@@ -22,6 +22,12 @@ Base.show(io::IO, p::ProjectInfo) = print(io,
     :desc      = "$(p.desc)"
     """)
 
+struct ModuleInfo
+    name    :: String
+    path    :: String
+    isdebug :: Bool
+end
+
 struct ModelCallback
     mod    :: String
     freq   :: Int # relative to thread frequency
@@ -29,21 +35,20 @@ struct ModelCallback
 end
 
 mutable struct ThreadInfo
+    name :: String
     freq :: Float64
     schedule :: Vector{ModelCallback}
-    function ThreadInfo()
-        new(1.0, Vector{ModelCallback}())
-    end
-    function ThreadInfo(f::Float64)
-        new(f, Vector{ModelCallback}())
+    function ThreadInfo(name::String, f::Float64)
+        new(name, f, Vector{ModelCallback}())
     end
 end
 
 mutable struct Scenario
     current_project :: ProjectInfo
 
-    paths :: Vector{String} # file path system
+    paths   :: Vector{String} # file path system
     threads :: Vector{ThreadInfo}
+    modules :: Vector{ModuleInfo} # model libraries
     function Scenario()
         new(ProjectInfo(), Vector{String}(), Vector{ThreadInfo}())
     end
@@ -76,13 +81,36 @@ function setproject(p::ProjectInfo) :: Nothing
     return
 end
 
-function addpath(p::String) :: Nothing
+function addpath!(p::String) :: Nothing
     if p in _scene.paths
         @warn "Path $(p) already registered"
     else
         push!(_scene.paths, p)
     end
     return
+end
+
+function searchpath(path::String; all::Bool = false) :: Vector{String}()
+    paths = Vector{String}()
+    for p in _scene.paths
+        gp = joinpath(p, path)
+        if isfile(gp)
+            append!(paths, gp)
+            if !all
+                break
+            end
+        end
+    end
+    return paths
+end
+
+function loadscene(filepath::String)
+    path = searchpath(filepath)
+    if length(path) == 0
+        @error "Failed to locate scene: $(filepath)"
+        return
+    end
+    # load file with TOML
 end
 
 end

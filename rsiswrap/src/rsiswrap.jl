@@ -135,7 +135,8 @@ function rsis_primitive_type(type :: String) :: DataType
 end
 
 function find_targets(addl_paths :: Vector{String} = Vector{String}() ) :: Dict{String, Target}
-    default_path = joinpath(pwd(), "templates")
+    cur_path = dirname(@__FILE__)
+    default_path = joinpath(cur_path, "..", "templates")
     if isdir(default_path)
         paths = [default_path; addl_paths]
     else
@@ -404,7 +405,7 @@ function generate_target(target::Target, ctxt::Context, output_folder::String)
     end
 end
 
-end
+end # module rsiswrap
 
 using .rsiswrap
 using ArgParse

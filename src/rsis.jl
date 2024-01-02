@@ -13,6 +13,9 @@ end
 using Unitful, TOML
 using DataFrames
 
+include("../rsiswrap/src/rsiswrap.jl")
+using .rsiswrap
+
 include("scenario.jl")
 using .scenario
 export projectinfo
@@ -20,6 +23,7 @@ export projectinfo
 include("project.jl")
 using .project
 export isprojectloaded, getprojectdirectory, loadproject, unloadproject
+export generate_interface, compile_model
 
 function __init__()
     @info "Welcome to RSIS $(__version__())"
