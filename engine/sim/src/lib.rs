@@ -7,9 +7,10 @@ mod threadcontext;
 
 use crate::state::EngineState;
 use crate::engine::Engine;
-use crate::threadcontext::ThreadContext;
+use crate::threadcontext::{ThreadContext};
 
 use std::{thread, time};
+use std::time::{Instant, Duration};
 use std::sync::{Arc, Barrier, mpsc, mpsc::TryRecvError, mpsc::Receiver, mpsc::Sender, Mutex};
 
 use rmodel::{ConfigStatus, RunStatus};
@@ -82,7 +83,9 @@ impl<const N: usize> Engine for SimEngine<N> {
     }
 }
 
-fn start_engine<const N: usize>(tcs : [Box<dyn ThreadContext + Send>; N]) -> SimEngine<N> {
+// creates the SimEngine struct, starts threads that are ready to initialize
+// @param[in] tcs - array of ThreadContext objects containing models to execute
+fn start_engine<const N: usize>(tcs : [Box<dyn ThreadContext + Send>; N], soft_real_time : bool) -> SimEngine<N> {
     // create barrier for thread sync
     let barr = Arc::new(Barrier::new(N));
 
@@ -93,12 +96,16 @@ fn start_engine<const N: usize>(tcs : [Box<dyn ThreadContext + Send>; N]) -> Sim
         let (txx, rxx) = mpsc::channel(); // trigger channel
         let (tx, rx)   = mpsc::channel(); // response channel
         let cbarrier = Arc::clone(&barr);
+        let srt = soft_real_time;
+        let timedelta  = Duration::from_secs_f64(tc.get_time().delta);
         let handle = thread::spawn(move||{
             let mut obj = tc;
 
             // before init procedures
             obj.set_tid(ind);
             // end init procedures
+
+            let mut frame_start = Instant::now();
 
             loop {
                 match rxx.recv() {
@@ -118,6 +125,9 @@ fn start_engine<const N: usize>(tcs : [Box<dyn ThreadContext + Send>; N]) -> Sim
                     }
                     Ok(ThreadCommand::EXECUTE(steps)) => {
                         for _ in 0..steps {
+                            if srt {
+                                frame_start = Instant::now();
+                            }
                             // wait for runner thread to trigger
                             cbarrier.wait();
 
@@ -141,6 +151,13 @@ fn start_engine<const N: usize>(tcs : [Box<dyn ThreadContext + Send>; N]) -> Sim
                                 },
                                 _ => {
                                     // do nothing
+                                }
+                            }
+                            if srt {
+                                // calculate time to next frame and sleep
+                                let elapsed = frame_start.elapsed();
+                                if elapsed < timedelta {
+                                    thread::sleep(timedelta - elapsed);
                                 }
                             }
                         }
