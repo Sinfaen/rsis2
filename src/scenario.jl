@@ -1,17 +1,25 @@
 module scenario
 
-export getscene, projectinfo, setproject, ProjectInfo
+using REPL.TerminalMenus
 
-struct ProjectInfo
+export getscene, projectinfo, setproject, ProjectInfo
+export issceneloaded, newscene, newscene_args
+
+mutable struct ProjectInfo
+    # printed in REPL
     loaded::Bool
     directory::String
     name::String
     desc::String
+
+    # not printed to REPL
+    scene_loaded::Bool
+    autocode_path::String
     function ProjectInfo()
-        new(false, "", "","")
+        new(false, "", "", "", false, "")
     end
-    function ProjectInfo(l::Bool, d::String, n::String, d2::String)
-        new(l, d, n, d2)
+    function ProjectInfo(l::Bool, d::String, n::String, d2::String, sl::Bool, ap::String)
+        new(l, d, n, d2, sl, ap)
     end
 end
 Base.show(io::IO, p::ProjectInfo) = print(io,
@@ -44,18 +52,23 @@ mutable struct ThreadInfo
 end
 
 mutable struct Scenario
-    current_project :: ProjectInfo
+    name :: String
+    scheduler :: String
 
     paths   :: Vector{String} # file path system
     threads :: Vector{ThreadInfo}
     modules :: Vector{ModuleInfo} # model libraries
     function Scenario()
-        new(ProjectInfo(), Vector{String}(), Vector{ThreadInfo}())
+        new("", "", Vector{String}(), Vector{ThreadInfo}(), Vector{ModuleInfo}())
+    end
+    function Scenario(n::String, s::String)
+        new(n, s, Vector{String}(), Vector{ThreadInfo}(), Vector{ModuleInfo}())
     end
 end
 
 # globals
 _scene = Scenario()
+_current_project = ProjectInfo()
 
 function getscene() :: Scenario
     return _scene
@@ -73,11 +86,12 @@ julia> projectinfo()
 ```
 """
 function projectinfo() :: ProjectInfo
-    return _scene.current_project
+    return _current_project
 end
 
 function setproject(p::ProjectInfo) :: Nothing
-    _scene.current_project = p
+    global _current_project
+    _current_project = p
     return
 end
 
@@ -90,7 +104,7 @@ function addpath!(p::String) :: Nothing
     return
 end
 
-function searchpath(path::String; all::Bool = false) :: Vector{String}()
+function searchpath(path::String; all::Bool = false) :: Vector{String}
     paths = Vector{String}()
     for p in _scene.paths
         gp = joinpath(p, path)
@@ -104,13 +118,47 @@ function searchpath(path::String; all::Bool = false) :: Vector{String}()
     return paths
 end
 
-function loadscene(filepath::String)
-    path = searchpath(filepath)
+function issceneloaded() :: Bool
+    return projectinfo().scene_loaded
+end
+
+function newscene_args(name::String, engine::String) :: Nothing
+    global _scene
+    # check to see if name is taken
+    path = searchpath(name * ".toml")
+    if length(path) != 0
+        throw(ErrorException("Scene with name: $(name) already exists"))
+    end
+    _scene = Scenario(name, engine)
+    _current_project.scene_loaded = true
+    @info "Created new scene: $(name)"
+end
+
+"""
+Creates new scene with terminal interaction
+"""
+function newscene(name::String = "", engine::String = "") :: Nothing
+    if isempty(name)
+        print("Enter name for the new scene: ")
+        name = String(strip(readline()))
+    end
+    if isempty(engine)
+        # TODO impelement check on OS
+        options = ["sim", "ubuntu"]
+        menu = RadioMenu(options, pagesize=4)
+        engine = options[request("Choose the scheduler:", menu)]
+    end
+    newscene_args(name, engine)
+end
+
+function loadscene(name::String)
+    path = searchpath(name * ".toml")
     if length(path) == 0
         @error "Failed to locate scene: $(filepath)"
         return
     end
     # load file with TOML
+    @info "TODO IMPLEMENT"
 end
 
 end

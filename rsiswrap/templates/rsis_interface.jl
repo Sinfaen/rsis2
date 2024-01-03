@@ -1,23 +1,6 @@
 # generates the model interface that is exposed to RSIS
 function render_to_buffer(data::Dict, io::IOBuffer)
-    _typeconvert = Dict(
-        "Bool" => "bool",
-        "Char" => "char",
-        "String" => "String",
-        "Int" => "i64",
-        "Int8" => "i8",
-        "Int16" => "i16",
-        "Int32" => "i32",
-        "UInt" => "u64",
-        "UInt8" => "u8",
-        "UInt16" => "u16",
-        "UInt32" => "u32",
-        "UInt64" => "u64",
-        "Float32" => "f32",
-        "Float64" => "f64",
-        "ComplexF32" => "Complex32",
-        "ComplexF64" => "Complex64",
-    )
+    tp = data["typeconvert"]
 
     function _type_to_string(x::Any) :: String
         if isa(x, String)
@@ -39,7 +22,7 @@ function render_to_buffer(data::Dict, io::IOBuffer)
             newdata = permutedims(x, reverse(1:ndims(x)))
             compacted = reshape(newdata, 1, :)
             dimtxt = join(["Const<$(d)>" for d in dims], ", ")
-            rtype = _typeconvert[type]
+            rtype = tp[type]
             arrstr = "ArrayStorage<$(rtype), $(join(dims, ", "))>"
             return "Matrix::<$(rtype), $(dimtxt), $(arrstr)>::new($(join(compacted, ",")))"
         end
@@ -67,15 +50,15 @@ function render_to_buffer(data::Dict, io::IOBuffer)
         write(io, "pub struct $(key)$(generictxt) {\n")
         for skey in val.fields
             if isempty(skey.dict_info)
-                if skey.type in keys(_typeconvert)
+                if skey.type in keys(tp)
                     # primitive type
-                    rtype = _typeconvert[skey.type]
+                    rtype = tp[skey.type]
                 else
                     # user defined type
                     rtype = replace(skey.type, "{" => "<", "}" => ">")
                 end
             else
-                rtype = "HashMap<$(_typeconvert[skey.dict_info[1]]),$(_typeconvert[skey.dict_info[2]])>"
+                rtype = "HashMap<$(tp[skey.dict_info[1]]),$(tp[skey.dict_info[2]])>"
             end
             if skey.is_scalar
                 write(io, "    pub $(skey.name) : $(rtype),\n")

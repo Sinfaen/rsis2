@@ -1,6 +1,6 @@
 [rsisproject]
-name = "all_data_types"
-desc = "Model exercising all interface structures supported by RSIS"
+name = "sine"
+desc = "Model that produces a discrete sine wave"
 version = "0.0.1"
 
 [scenes]

@@ -1,26 +1,9 @@
 # generates an optional messagepack interface for loading structures
 # from MessagePack. Used in runtime simulations
 function render_to_buffer(data::Dict, io::IOBuffer)
-    _typeconvert = Dict(
-        "Bool" => "bool",
-        "Char" => "char",
-        "String" => "String",
-        "Int" => "i64",
-        "Int8" => "i8",
-        "Int16" => "i16",
-        "Int32" => "i32",
-        "UInt" => "u64",
-        "UInt8" => "u8",
-        "UInt16" => "u16",
-        "UInt32" => "u32",
-        "UInt64" => "u64",
-        "Float32" => "f32",
-        "Float64" => "f64",
-        "ComplexF32" => "Complex32",
-        "ComplexF64" => "Complex64",
-    )
     base_name = data["base_name"]
     intf_name = "$(base_name)_interface"
+    tp = data["typeconvert"]
 
     write(io,
     """
@@ -66,7 +49,7 @@ function render_to_buffer(data::Dict, io::IOBuffer)
         write(io,
         """
                 $(ind) => {
-                    let data : Vec<$(_typeconvert[skey.type])> = rmp_serde::from_slice(mp).unwrap();
+                    let data : Vec<$(tp[skey.type])> = rmp_serde::from_slice(mp).unwrap();
                     if data.len() != $(prod(skey.dimension)) { return 1; }
                     obj.$(skey.name) = SMatrix::from_vec(data);
                     return 0;
@@ -82,14 +65,14 @@ function render_to_buffer(data::Dict, io::IOBuffer)
                 },
         """)
                 end
-            elseif skey.type in keys(_typeconvert) || !isempty(skey.dict_info)
+            elseif skey.type in keys(tp) || !isempty(skey.dict_info)
                 # primitive
                 if length(skey.dimension) > 1
                     # SMatrix
         write(io,
         """
                 $(ind) => {
-                    let data : Vec<$(_typeconvert[skey.type])> = rmp_serde::from_slice(mp).unwrap();
+                    let data : Vec<$(tp[skey.type])> = rmp_serde::from_slice(mp).unwrap();
                     if data.len() != $(prod(skey.dimension)) { return 1; }
                     obj.$(skey.name) = SMatrix::from_vec(data);
                     return 0;
@@ -148,7 +131,7 @@ function render_to_buffer(data::Dict, io::IOBuffer)
                     rmp_serde::to_vec(&obj.$(skey.name))
                 }
         """)
-            elseif skey.type in keys(_typeconvert) || !isempty(skey.dict_info)
+            elseif skey.type in keys(tp) || !isempty(skey.dict_info)
                 # primitive
         write(io,
         """

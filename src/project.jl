@@ -45,8 +45,13 @@ function loadproject(directory::String = ".") :: Nothing
         throw(ErrorException("[rsisproject] is missing `name`"))
     end
 
+    autocode_path = joinpath(_dir, "autocode")
+    if !isdir(autocode_path)
+        mkdir(autocode_path)
+    end
+
     setproject(ProjectInfo(true, _dir, projectdata["rsisproject"]["name"],
-        haskey(dat, "desc") ? dat["desc"] : ""))
+        haskey(dat, "desc") ? dat["desc"] : "", false, autocode_path))
     @info "Loaded RSIS project at $(projectinfo().directory)"
 end
 

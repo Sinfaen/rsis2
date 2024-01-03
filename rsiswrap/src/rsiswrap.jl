@@ -107,6 +107,26 @@ _primitive_types = Dict{String, DataType}([
     "ComplexF64" => ComplexF64,
 ])
 
+# passed along to targets for easy type handling
+_typeconvert = Dict(
+    "Bool" => "bool",
+    "Char" => "char",
+    "String" => "String",
+    "Int" => "i64",
+    "Int8" => "i8",
+    "Int16" => "i16",
+    "Int32" => "i32",
+    "UInt" => "u64",
+    "UInt8" => "u8",
+    "UInt16" => "u16",
+    "UInt32" => "u32",
+    "UInt64" => "u64",
+    "Float32" => "f32",
+    "Float64" => "f64",
+    "ComplexF32" => "Complex32",
+    "ComplexF64" => "Complex64",
+)
+
 """
 Splits typenames into tokens. If only 1 element, regular type.
 If multiple, generic is detected
@@ -393,7 +413,7 @@ function generate_target(target::Target, ctxt::Context, output_folder::String)
 
         # now we can get down to business
         afunc = evalfile(infilepath)
-        init = Dict("base_name" => ctxt.name, "ctxt" => ctxt)
+        init = Dict("base_name" => ctxt.name, "ctxt" => ctxt, "typeconvert" => _typeconvert)
 
         # output to file!
         outfilepath = joinpath(output_folder, replace(temp["filename"], "*" => ctxt.name))
