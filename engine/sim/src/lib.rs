@@ -49,10 +49,6 @@ pub enum ThreadResult {
     END,
 }
 
-//impl<const N: usize> SimEngine<N> {
-//    //
-//}
-
 impl<const N: usize> Engine for SimEngine<N> {
 
     fn get_state(&self) -> EngineState {
@@ -67,19 +63,75 @@ impl<const N: usize> Engine for SimEngine<N> {
     }
 
     fn init(&mut self) -> i32 {
-        return 0;
+        match self.state.lock() {
+            Ok(_) => {
+                match self.runner_tx.send(ThreadCommand::INIT) {
+                    Ok(_) => {
+                        return 0;
+                    },
+                    _ => {
+                        return 2; // failed to send command
+                    }
+                }
+            },
+            _ => {
+                return -1; // failed to lock
+            }
+        }
     }
 
-    fn step(&mut self, _steps: usize) -> i32 {
-        return 0;
+    fn step(&mut self, steps: u64) -> i32 {
+        match self.state.lock() {
+            Ok(_) => {
+                match self.runner_tx.send(ThreadCommand::EXECUTE(steps)) {
+                    Ok(_) => {
+                        return 0;
+                    }
+                    _ => {
+                        return 2; // failed to send command
+                    }
+                }
+            },
+            _ => {
+                return -1; // failed to lock
+            }
+        }
     }
 
     fn pause(&mut self) -> i32 {
-        return 0;
+        match self.state.lock() {
+            Ok(_) => {
+                match self.runner_tx.send(ThreadCommand::PAUSE) {
+                    Ok(_) => {
+                        return 0;
+                    },
+                    _ => {
+                        return 2; // failed to send command
+                    }
+                }
+            },
+            _ => {
+                return -1; // failed to lock
+            }
+        }
     }
 
     fn end(&mut self) -> i32 {
-        return 0;
+        match self.state.lock() {
+            Ok(_) => {
+                match self.runner_tx.send(ThreadCommand::SHUTDOWN) {
+                    Ok(_) => {
+                        return 0;
+                    },
+                    _ => {
+                        return 2; // failed to send command
+                    }
+                }
+            },
+            _ => {
+                return -1; // failed to lock
+            }
+        }
     }
 }
 
@@ -305,7 +357,7 @@ fn start_engine<const N: usize>(tcs : [Box<dyn ThreadContext + Send>; N], soft_r
                 }
                 _ => ()
             }
-            thread::sleep(time::Duration::from_millis(20)); // sleep to prevent hogging the cpu
+            thread::sleep(Duration::from_millis(20)); // sleep to prevent hogging the cpu
         }
     });
 
