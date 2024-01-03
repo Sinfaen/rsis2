@@ -18,12 +18,16 @@ using .rsiswrap
 
 include("scenario.jl")
 using .scenario
-export projectinfo
+export projectinfo, issceneloaded, newscene, newscene_args
 
 include("project.jl")
 using .project
 export isprojectloaded, getprojectdirectory, loadproject, unloadproject
 export generate_interface, compile_model
+
+include("generate.jl")
+using .generate
+export autogenerate_scene
 
 function __init__()
     @info "Welcome to RSIS $(__version__())"
