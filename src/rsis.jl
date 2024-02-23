@@ -7,7 +7,7 @@ Getting Started:
 module rsis
 
 function __version__()
-    return "0.1.0"
+    return "0.2.0"
 end
 
 using Unitful, TOML

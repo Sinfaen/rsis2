@@ -1,27 +1,30 @@
 # Sine Wave
 # - generic
 # - parameters are copied to the inputs at init
-[root]
+[model]
 name = "sine"
-desc = "Sine wave generator"
+desc = "Sine wave generator. Generic over input type"
 
-# this model is generic over output signal type
-
+[types.sine.generic.T]
+options = ["f32", "f64"]
+default = "f64"
 [types.sine]
-generic = [{name="T", options=["Float32", "Float64"], default="Float64"}]
 desc = "sine wave generator"
 fields = [
-    {name="input", type="sine_params{T}", tag="in"},
-    {name="output", type="T", value=0.0, tag="out"},
-    {name="phase", type="T", value=0.0, tag="data"},
-    {name="params", type="sine_params{T}", tag="params"},
+    {name="input",  type="sine_params", generic=["T"], tag="in"},
+    {name="output", type="T", default=0.0, tag="out"},
+    {name="phase",  type="T", default=0.0, tag="data"},
+    {name="params", type="sine_params", generic=["T"], tag="params"},
 ]
 
+[types.sine_params.generic.T]
+options = ["f32", "f64"]
+default = "f64"
 [types.sine_params]
-generic = [{name="T", default="Float64"}]
 desc = "sine wave parameters"
 fields = [
-    {name="amplitude", type="T", value=1.0, desc="Maximum amplitude"},
-    {name="frequency", type="T", value=1.0, desc="Frequency [Hz]"},
-    {name="offset",    type="T", value=0.0, desc="Phase offset"},
+    {name="amplitude", type="T", default=1.0, desc="Maximum amplitude"},
+    {name="frequency", type="T", default=1.0, desc="Frequency [Hz]"},
+    {name="offset",    type="T", default=0.0, desc="Phase offset"},
+    {name="bias",      type="T", default=0.0, desc="Bias offset"},
 ]
