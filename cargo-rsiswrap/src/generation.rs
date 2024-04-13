@@ -19,6 +19,7 @@ pub struct RustTemplate {
     pub name: String,
     pub tags : HashMap<String, String>,
     pub has_ndarray: bool,
+    pub imports: BTreeSet<String>,
 }
 
 
@@ -30,6 +31,7 @@ pub struct CppTemplate {
     pub name: String,
     pub tags : HashMap<String, String>,
     pub has_ndarray: bool,
+    pub imports: BTreeSet<String>,
 }
 
 #[derive(Template)]
@@ -40,6 +42,7 @@ pub struct MsgPackTemplate {
     pub name: String,
     pub tags : HashMap<String, String>,
     pub has_ndarray: bool,
+    pub imports: BTreeSet<String>,
 }
 
 pub fn rust_dimstr(typename: &String, dims: &Vec<i64>) -> String {
@@ -101,6 +104,7 @@ pub fn generate_template(ctxt: &Context, filename: &str, template: &str) -> bool
                 name: ctxt.name.clone(),
                 tags: ctxt.tags.clone(),
                 has_ndarray: ctxt.has_ndarray,
+                imports: ctxt.imports.clone(),
             };
             match r_int.render() {
                 Ok(t) => txt = t,
@@ -114,6 +118,7 @@ pub fn generate_template(ctxt: &Context, filename: &str, template: &str) -> bool
                 name: ctxt.name.clone(),
                 tags: ctxt.tags.clone(),
                 has_ndarray: ctxt.has_ndarray,
+                imports: ctxt.imports.clone(),
             };
             match cpp_int.render() {
                 Ok(t) => txt = t,
@@ -130,6 +135,7 @@ pub fn generate_template(ctxt: &Context, filename: &str, template: &str) -> bool
                 name: ctxt.name.clone(),
                 tags: ctxt.tags.clone(),
                 has_ndarray: ctxt.has_ndarray,
+                imports: ctxt.imports.clone(),
             };
             match msp_int.render() {
                 Ok(t) => txt = t,

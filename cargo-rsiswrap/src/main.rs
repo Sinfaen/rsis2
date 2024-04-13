@@ -7,6 +7,8 @@ mod context;
 use crate::context::*;
 mod generation;
 use crate::generation::*;
+mod predefined;
+use crate::predefined::*;
 
 /// parser
 #[derive(Parser, Debug)]
@@ -25,7 +27,7 @@ struct Args {
     target: String,
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 enum ValueType {
     BOOLEAN,
     UnsignedInteger,
@@ -100,7 +102,7 @@ fn validate_default(name: &str, vtype: ValueType, dims: &[i64], data: &toml::Val
             return Err(format!("Field {} default is an array for a scalar value", name))
         }
         if !validate_value(&vtype, data) {
-            return Err(format!("Field {} default does not match defined type", name))
+            return Err(format!("Field {} default does not match defined type: {:?}", name, vtype))
         }
     } else {
         // ndarray
@@ -140,8 +142,13 @@ fn parse_field(ctxt : &mut Context, sd : &mut RsisStruct, data : &toml::Table) -
     if !is_generic {
         // otherwise check that the type is defined
         if !ctxt.structs.contains(typename.as_str()) {
-            if get_type_format(typename.as_str()) == ValueType::INVALID {
-                return Err(format!("Field {} has base type [{}], which is undefined", name, typename))
+            if ctxt.importedstructs.contains(typename.as_str()) {
+                let imp = ctxt.structinfo[typename.as_str()].import.clone();
+                ctxt.imports.insert(imp);
+            } else {
+                if get_type_format(typename.as_str()) == ValueType::INVALID {
+                    return Err(format!("Field {} has base type [{}], which is undefined", name, typename))
+                }
             }
         }
     }
@@ -181,16 +188,14 @@ fn parse_field(ctxt : &mut Context, sd : &mut RsisStruct, data : &toml::Table) -
     }
 
     if !is_struct {
-        if !data.contains_key("default") {
-            return Err(format!("Field {} missing [default]", name))
-        }
-        if is_generic {
-            //
-        } else {
-            let vtype = get_type_format(typename.as_str());
-            match validate_default(name.as_str(), vtype, dims.as_slice(), &data["default"]) {
-                Ok(_) => {},
-                Err(e) => return Err(e)
+        if data.contains_key("default") {
+            println!("Warning: field {} missing [default]", name);
+            if !is_generic {
+                let vtype = get_type_format(typename.as_str());
+                match validate_default(name.as_str(), vtype, dims.as_slice(), &data["default"]) {
+                    Ok(_) => {},
+                    Err(e) => return Err(e)
+                }
             }
         }
     }
@@ -223,8 +228,8 @@ fn parse_field(ctxt : &mut Context, sd : &mut RsisStruct, data : &toml::Table) -
 
 fn parse_generic(name : String, data : &toml::Table) -> Result<GenericType, String> {
     let mut gen = GenericType {
-        options : vec![],
-        default : "".to_string(),
+        options: vec![],
+        default: "".to_string(),
     };
     if data.contains_key("options") {
         match data["options"].as_array() {
@@ -264,8 +269,10 @@ fn parse_struct(ctxt : &mut Context, name : String, data : & toml::Table) -> Res
         name: name.clone(),
         desc: "".to_string(),
         fields: Vec::new(),
+        import: "".to_string(),
         generics: BTreeMap::new(),
         is_generic: false,
+        is_imported: false,
     };
 
     if data.contains_key("desc") {
@@ -366,10 +373,13 @@ fn parse_idl(contents : String) -> Result<Context, String> {
     let mut ctxt = Context {
         structs: all_types.clone(),
         structinfo: HashMap::new(),
+        importedstructs: BTreeSet::new(),
         name: name.clone(),
         tags: HashMap::new(),
         has_ndarray: false,
+        imports: BTreeSet::new(),
     };
+    add_predefined_structures(&mut ctxt);
 
     // get the struct definitions
     for (key, value) in types {

@@ -1,5 +1,8 @@
 // Generated with rsiswrap
 // model : {{name}}
+{%- for imp in imports %}
+use {{imp}};
+{%- endfor %}
 {%- if has_ndarray %}
 use nalgebra::SMatrix;
 {%- endif %}

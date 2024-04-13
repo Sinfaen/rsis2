@@ -34,17 +34,21 @@ pub struct RsisStruct {
     pub name: String,
     pub desc: String,
     pub fields: Vec<Port>,
+    pub import: String,
 
     pub generics: BTreeMap<String, GenericType>,
     pub is_generic: bool,
+    pub is_imported: bool,
 }
 
 pub struct Context {
     /// Names of all structs. Post-processed so that struct dependencies in C++ wrappers compile
     pub structs : BTreeSet<String>,
     pub structinfo : HashMap<String, RsisStruct>,
+    pub importedstructs: BTreeSet<String>,
     pub name: String,
     pub tags: HashMap<String, String>,
 
     pub has_ndarray: bool,
+    pub imports: BTreeSet<String>,
 }
