@@ -32,6 +32,16 @@ pub struct CppTemplate {
     pub has_ndarray: bool,
 }
 
+#[derive(Template)]
+#[template(path = "msgpack.rs", escape="none")]
+pub struct MsgPackTemplate {
+    pub structs : BTreeSet<String>,
+    pub structinfo : HashMap<String, RsisStruct>,
+    pub name: String,
+    pub tags : HashMap<String, String>,
+    pub has_ndarray: bool,
+}
+
 pub fn rust_dimstr(typename: &String, dims: &Vec<i64>) -> String {
     let txtarr: Vec<String> = dims
         .into_iter()
@@ -70,6 +80,11 @@ pub fn generics_join(generics: &BTreeMap<String, GenericType>) -> String {
     let k: Vec<String> = generics.keys().cloned().collect();
     k.join(",")
 }
+pub fn generics_deserialize(generics: &BTreeMap<String, GenericType>) -> String {
+    let keys: Vec<String> = generics.keys().cloned().collect();
+    let txt: Vec<String> = keys.into_iter().map(|x| x + ": for <'a> Deserialize<'a>").collect();
+    txt.join(",")
+}
 pub fn join_string(strings: &Vec<String>) -> String {
     strings.join(",")
 }
@@ -107,6 +122,19 @@ pub fn generate_template(ctxt: &Context, filename: &str, template: &str) -> bool
         },
         "interface.cxx" => {
             return false
+        },
+        "msgpack.rs" => {
+            let msp_int = MsgPackTemplate {
+                structs: ctxt.structs.clone(),
+                structinfo: ctxt.structinfo.clone(),
+                name: ctxt.name.clone(),
+                tags: ctxt.tags.clone(),
+                has_ndarray: ctxt.has_ndarray,
+            };
+            match msp_int.render() {
+                Ok(t) => txt = t,
+                Err(_e) => return false,
+            }
         },
         _ => return false
     }

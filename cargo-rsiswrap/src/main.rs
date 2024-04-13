@@ -401,7 +401,7 @@ fn main() -> Result<(), String> {
     }.to_string();
 
     match args.target.as_str() {
-        "interface.rs" | "interface.hxx" => {},
+        "interface.rs" | "interface.hxx" | "msgpack.rs" => {},
         _ => {
             return Err("Unsupported target".to_string())
         }
