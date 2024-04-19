@@ -22,7 +22,7 @@ impl RModel for sine<f32> {
     }
     fn step(&mut self, _: &mut Box<dyn RFrameWork>) -> RunStatus {
         // generate output
-        self.output = self.input.amplitude * (self.phase + self.input.offset).sin();
+        self.output = self.input.amplitude * (self.phase + self.input.offset).sin() + self.input.bias;
         // update phase last
         self.phase += self.input.frequency;
         RunStatus::OK
@@ -43,7 +43,7 @@ impl RModel for sine<f64> {
     }
     fn step(&mut self, _: &mut Box<dyn RFrameWork>) -> RunStatus {
         // generate output
-        self.output = self.input.amplitude * (self.phase + self.input.offset).sin();
+        self.output = self.input.amplitude * (self.phase + self.input.offset).sin() + self.input.bias;
         // update phase last
         self.phase += self.input.frequency;
         RunStatus::OK

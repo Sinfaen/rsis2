@@ -1,0 +1,12 @@
+[model]
+name = "hashmap"
+desc = "unit test for hashmaps in RSIS"
+
+[types.hashmap]
+desc = ""
+fields = [
+    {name="input",  type="f64", default=4.0, tag="in"},
+    {name="output", type="f64", default=5.0, tag="out"},
+    {name="param", type="HashMap", generic=["i32", "i64"], tag="params"},
+    {name="wk", type="HashMap", generic=["String", "bool"], tag="data"},
+]

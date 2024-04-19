@@ -1,0 +1,11 @@
+[model]
+name = "ndarray"
+desc = "unit test for ndarrays in RSIS"
+
+[types.ndarray]
+desc = ""
+fields = [
+    {name="input",  type="f64", dims=[2,2], tag="in"},
+    {name="output", type="f64", dims=[2,2], tag="out"},
+    {name="wk", type="f32", dims=[3,3,3], tag="data"},
+]

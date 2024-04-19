@@ -1,0 +1,10 @@
+[model]
+name = "complex"
+desc = "unit test for complex numbers in RSIS"
+
+[types.complex]
+desc = ""
+fields = [
+    {name="input",  type="Complex", generic=["f64"], tag="in"},
+    {name="output", type="Complex", generic=["f64"], tag="out"},
+]
