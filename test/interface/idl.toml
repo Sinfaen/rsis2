@@ -7,7 +7,7 @@
 # The high level interface of the model is defined by the `root` key
 # so that tagging of specific portions of the interface can be done.
 # - rsiswrap by will search for the ['in', 'out', 'data', 'params'] keys specifically
-[root]
+[model]
 name = "all_data_types"
 desc = "Example model showing all supported data types in RSIS"
 
@@ -23,28 +23,28 @@ fields = [
 [types.all_data_types_in]
 desc = "model inputs"
 fields = [
-    {name="signal", type="Float64", value=1.0, unit="m", desc="a floating point value"}
+    {name="signal", type="f64", default=1.0, unit="m", desc="a floating point default"}
 ]
 
 [types.all_data_types_out]
 desc = "model outputs"
 fields = [
-    {name="measurement", type="Float32", value=1.0, unit="m", desc="a simulated sensor measurement"}
+    {name="measurement", type="f32", default=1.0, unit="m", desc="a simulated sensor measurement"}
 ]
 
 [types.all_data_types_data]
 desc = "model internal data"
 fields = [
-    {name="internalflag", type="Bool", value=true},
-    {name="queue", type="Int32", dims=[-1], value=[0], desc="a list of queued ints"},
-    {name="amatrix", type="UInt32", dims=[3,3], value=[[1, 0, 0], [0, 2, 0], [0, 0, 21]], desc="a matrix"},
+    {name="internalflag", type="bool", default=true},
+    {name="queue",   type="i32", dims=[-1], default=[0], desc="a list of queued ints"},
+    {name="amatrix", type="u32", dims=[3,3], default=[[1, 0, 0], [0, 2, 0], [0, 0, 21]], desc="a matrix"},
 ]
 
 [types.all_data_types_params]
 desc = "model parameters, loaded at initialization"
 fields = [
-    {name="noise", type="ComplexF64", value=[0.1, 0.2], unit="V"},
-    {name="noiseSq", type="ComplexF32", dims=[3], value=[[1.0, 2.1], [0.0, 0.1], [59, -0.1]]},
-    {name="name", type="String", value="Sensor_Jan_359", desc="Sensor name"},
-    {name="txt", type="Dict{String,String}", value=[["hello", "world"], ["dio", "gigantomachia"]]},
+    {name="noise",   type="Complex", generic=["f64"], unit="V"},
+    {name="noiseSq", type="Complex", generic=["f32"], dims=[3]},
+    {name="name", type="String", default="Sensor_Jan_359", desc="Sensor name"},
+    {name="txt", type="HashMap", generic=["String", "String"]},
 ]
