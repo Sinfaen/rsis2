@@ -1,19 +1,21 @@
 # Sine
-Dyamic sine wave generator.
+> sine{T}  
+> T ∈ (Float32, **Float64**).
 
-## Parameterz
-The `sine` model exposes the following default parameters:
+Sinusoidal wave generator.
 
+## Parameters
 | Name | DataType | Default | Symbol | Description |
 | --- | --- | --- | --- | --- |
-| Amplitude | Float64 | 1.0 | -- | Maximum amplitude |
-| Frequency | Float64 | 1.0 | f | Frequency in Hz |
-| Offset | Float64 | 0.0 | $ϕ_0$ | Initial phase offset |
+| Amplitude | T | 1.0 | A | Maximum amplitude |
+| Frequency | T | 1.0 | f | Frequency in Hz |
+| Offset | T | 0.0 | $ϕ_0$ | Phase offset |
+| Bias | T | 0.0 | B | Bias offset |
 
 ## Implementation
-Amplitude, frequency, duty, and bias are inputs to the waveform model. On initialization, the parameters of the same name are copied to their respective inputs. These values are exposed as inputs to allow for run-time modification, allowing for setup of complex behavior.
+The parameters are duplicated as inputs to the sine model. On initialization, the parameters are copied to their respective inputs. These values are exposed as inputs to allow for run-time modification via the outputs of other models.
 
-All implementations use differential logic, so as to prevent issues with floating point precision for long running simulations. All implementations rely on a constant timestep, `Δt`.
+The model uses differential logic to prevent issues with floating point precision for long running simulations. All implementations rely on a constant timestep, `Δt`.
 
 ## Sine
 Internal States:
@@ -39,22 +41,4 @@ Init:
 Step:
 - $ϕ_{n+1} = ϕ_n + f*Δt$
 - $ϕ_{n+1} = ϕ_{n+1} \medspace mod \medspace 1$
-- $signal = A*sgn(D - ϕ) + b$
-
-## Triangle
-Internal States:
-- `ϕ`
-    - phase angle
-
-Init:
-- $ϕ = ϕ_0 \medspace mod \medspace 1$
-
-Step:
-- $ϕ_{n+1} = ϕ_n + f*Δt$
-- $ϕ_{n+1} = ϕ_{n+1} \medspace mod \medspace 1$
-- if $ϕ_{n+1} < D$
-    - $signal = A\frac{ϕ_{n+1}}{D} + b$
-- if $ϕ_{n+1} == D$
-    - $signal = A + b$
-- if $ϕ_{n+1} > D$
-    - $signal = ϕ_{n+1} + b$
+- $signal = A*sgn(D - ϕ) + B$

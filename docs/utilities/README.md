@@ -1,15 +1,9 @@
 # Utility Models
 The base set of models provided by RSIS for users.
 
-
-## AffineTransform
-TODO: Provides functionality for `y = ax + b`. Supports unit conversion, but is exposed for general usage.
-
-
-| Parameter | Data | Default | Usage |
-| --- | --- | --- | --- |
-| Scale | `f64` | 1 | Scaling of the input |
-| Bias | `f64` | 0 | Bias of the input |
+| Model | Desc |
+| ----- | ---- |
+| [Sine](../../utilities/sine/README.md) | Generates sinusoidal waveforms |
 
 ## Clock
 TODO: Implements a simplistic clock .
@@ -29,20 +23,6 @@ TODO: Implements UDP, TCP.
 ## ODE
 TODO: expose the `ode_solvers` crate.
 
-## Signal
-TODO: Implements a variety of simple signal types.
-
-
-| Parameter | Data | Default | Usage |
-| --- | --- | --- | --- |
-| SignalType | `String` | `Sine` | Signal type to output |
-
-| Supported Signals | Notes | Additional Parameters |
-| --- | --- | --- |
-| Sine | Sine wave | amplitude, frequency, phase |
-| Cosine | Cosine wave | amplitude, frequency, phase |
-| PWM | Pulse Width Modulation | amplitude, duty, phase |
-| Sawtooth | Sawtooth wave | amplitude, peak |
 
 ## Switch
 TODO: Multiple input, single output. Accepts an index to select which input is passed through to the output.
