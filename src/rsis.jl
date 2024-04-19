@@ -13,12 +13,9 @@ end
 using Unitful, TOML
 using DataFrames
 
-include("../rsiswrap/src/rsiswrap.jl")
-using .rsiswrap
-
 include("scenario.jl")
 using .scenario
-export projectinfo, issceneloaded, newscene, newscene_args
+export projectinfo, issceneloaded, newscene, newscene_args, loadscene
 
 include("project.jl")
 using .project

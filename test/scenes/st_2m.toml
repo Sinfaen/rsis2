@@ -1,0 +1,26 @@
+[scene]
+name="st_2m"
+desc="unit test: single threaded two models"
+engine="sim"
+stop= "2 minute"
+
+[[schedule]]
+lib  = "sine"
+name = "gen1"
+freq = 10.0
+
+[[schedule]]
+lib  = "sine"
+name = "gen2"
+freq = 10.0
+
+[connections]
+"gen1:gen2" = [
+    "output input.amplitude"
+]
+
+[[logging]]
+rate = 10.0
+signals = [
+    "gen2.output"
+]

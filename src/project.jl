@@ -2,7 +2,6 @@ module project
 
 using ..TOML
 using ..scenario
-using ..rsiswrap
 
 export isprojectloaded, getprojectdirectory, loadproject, unloadproject
 export generate_interface, compile_model
@@ -102,10 +101,6 @@ end
 function generate_interface()
     if interfaces_out_of_date()
         @info "Generating interface"
-        ctxt = rsiswrap.parse_idl(_idl_path())
-        output_folder = joinpath(projectinfo().directory, "src")
-        all_targets = rsiswrap.find_targets()
-        rsiswrap.generate_target(all_targets["rsis"], ctxt, output_folder)
     else
         @info "Interface up to date"
     end
