@@ -6,6 +6,12 @@ using ..Unitful
 
 export getscene, projectinfo, setproject, ProjectInfo
 export issceneloaded, newscene, newscene_args, loadscene
+export ProjectType, Model, Container
+
+@enum ProjectType begin
+    Model = 1
+    Container = 2
+end
 
 mutable struct ProjectInfo
     # printed in REPL
@@ -13,15 +19,16 @@ mutable struct ProjectInfo
     directory::String
     name::String
     desc::String
+    type::ProjectType
 
     # not printed to REPL
     scene_loaded::Bool
     autocode_path::String
     function ProjectInfo()
-        new(false, "", "", "", false, "")
+        new(false, "", "", "", Model, false, "")
     end
-    function ProjectInfo(l::Bool, d::String, n::String, d2::String, sl::Bool, ap::String)
-        new(l, d, n, d2, sl, ap)
+    function ProjectInfo(l::Bool, d::String, n::String, d2::String, t::ProjectType, sl::Bool, ap::String)
+        new(l, d, n, d2, t, sl, ap)
     end
 end
 Base.show(io::IO, p::ProjectInfo) = print(io,
@@ -30,6 +37,7 @@ Base.show(io::IO, p::ProjectInfo) = print(io,
     :directory = "$(p.directory)"
     :name      = "$(p.name)"
     :desc      = "$(p.desc)"
+    :type      = "$(p.type)"
     """)
 
 struct ModuleInfo

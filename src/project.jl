@@ -43,6 +43,7 @@ function loadproject(directory::String = ".") :: Nothing
     if !haskey(dat, "name")
         throw(ErrorException("[rsisproject] is missing `name`"))
     end
+    ptype = haskey(projectdata, "cargo") ? Model : Container
 
     autocode_path = joinpath(_dir, "autocode")
     if !isdir(autocode_path)
@@ -50,7 +51,8 @@ function loadproject(directory::String = ".") :: Nothing
     end
 
     setproject(ProjectInfo(true, _dir, projectdata["rsisproject"]["name"],
-        haskey(dat, "desc") ? dat["desc"] : "", false, autocode_path))
+        haskey(dat, "desc") ? dat["desc"] : "",
+        ptype, false, autocode_path))
     @info "Loaded RSIS project at $(projectinfo().directory)"
 end
 

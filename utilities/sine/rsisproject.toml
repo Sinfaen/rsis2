@@ -5,3 +5,6 @@ version = "0.0.1"
 
 [scenes]
 base = "scenes/base.toml"
+
+[cargo]
+path = "Cargo.toml"
