@@ -16,7 +16,7 @@ freq = 10.0
 
 [connections]
 "gen1:gen2" = [
-    "output input.amplitude"
+    ["output", "input.amplitude"],
 ]
 
 [[logging]]

@@ -64,19 +64,59 @@ mutable struct ThreadInfo
     end
 end
 
+struct Signal
+    model :: String
+    path :: String
+end
+
+struct SourceConnect
+    # output -> input
+    data :: Dict{String, Set{Signal}}
+    function SourceConnect()
+        new(Dict{String, Set{Signal}}())
+    end
+end
+struct SinkConnect
+    # input -> output
+    data :: Dict{String, Signal}
+    function SinkConnect()
+        new(Dict{String, Signal}())
+    end
+end
+Base.merge!(x::SourceConnect, others::SourceConnect) = begin
+    for (key, val) in others.data
+        if haskey(x.data, key)
+            union!(x.data[key], val)
+        else
+            x.data[key] = val
+        end
+    end
+end
+Base.merge!(x::SinkConnect, others::SinkConnect) = begin
+    merge!(x.data, others.data)
+end
+
 mutable struct Scenario
     name :: String
     scheduler :: String
 
     threads :: Vector{ThreadInfo}
     modules :: Set{String} # model libraries
+    cnct_forward :: Dict{String, SourceConnect}
+    cnct_backwrd :: Dict{String, SinkConnect}
 
     stoptime :: Float64 # seconds
     function Scenario()
-        new("", "", Vector{ThreadInfo}(), Set{String}(), 0.0)
+        new("", "", Vector{ThreadInfo}(), Set{String}(),
+            Dict{String, SourceConnect}(),
+            Dict{String, SinkConnect}(),
+            0.0)
     end
     function Scenario(n::String, s::String)
-        new(n, s, Vector{ThreadInfo}(), Set{String}(), 0.0)
+        new(n, s, Vector{ThreadInfo}(), Set{String}(),
+        Dict{String, SourceConnect}(),
+        Dict{String, SinkConnect}(),
+            0.0)
     end
 end
 
@@ -187,6 +227,7 @@ function _parse_scheduled(data::Dict) :: Tuple{String, ModelCallback}
     for k in ["lib", "name", "freq"]
         if !haskey(data, k)
             @error "Schedule definition missing [$(k)]"
+            return
         end
     end
     l = data["lib"]
@@ -202,6 +243,59 @@ function _parse_scheduled(data::Dict) :: Tuple{String, ModelCallback}
         @error "Scheduled model [freq] is not a number"
     end
     return (l, ModelCallback(n, 1, 0, f))
+end
+
+function _parse_cnct(omodel::AbstractString, imodel::AbstractString, data::AbstractArray) :: Tuple{SourceConnect, SinkConnect}
+    source = SourceConnect()
+    sink = SinkConnect()
+    for pathspec in data
+        if length(pathspec) != 2
+            throw(ErrorException("connection is ill-defined. length $(length(pathspec))"))
+        end
+        # pathspec == [output path, input path]
+        # do not perform path resolution
+        if !haskey(source.data, pathspec[1])
+            source.data[pathspec[1]] = Set{Signal}()
+        end
+        push!(source.data[pathspec[1]], Signal(imodel, pathspec[2]))
+        sink.data[pathspec[2]] = Signal(omodel, pathspec[1])
+    end
+    return (source, sink)
+end
+
+function _parse_connections(data::Dict) :: Tuple{Dict{String, SourceConnect}, Dict{String, SinkConnect}}
+    sources = Dict{String, SourceConnect}()
+    sinks = Dict{String, SinkConnect}()
+
+    for (key, val) in data
+        if !isa(key, String)
+            @error "connection key is not a string"
+        end
+        if !(typeof(val) <: AbstractArray)
+            @error "connection [$(key)] is not array-like"
+            return
+        end
+        tok = split(key, ":")
+        if length(tok) != 2
+            @error "connection model specification [$(key)] invalid"
+            return
+        end
+        # tok == output:input
+        if !haskey(sources, tok[1])
+            sources[tok[1]] = SourceConnect()
+        end
+        if !haskey(sinks, tok[2])
+            sinks[tok[2]] = SinkConnect()
+        end
+        if !(typeof(val) <: AbstractArray)
+            @error "connection path $(val) is not array-like"
+            return
+        end
+        (source, sink) = _parse_cnct(tok[1], tok[2], val)
+        merge!(sources[tok[1]], source)
+        merge!(sinks[tok[2]], sink)
+    end
+    return (sources, sinks)
 end
 
 function loadscene(name::String) :: Nothing
@@ -267,8 +361,18 @@ function loadscene(name::String) :: Nothing
         return
     end
 
+    if haskey(data, "connections")
+        cnct = data["connections"]
+        if !isa(cnct, Dict)
+            @error "[connections] is not a dictionary"
+            return
+        end
+        (ns.cnct_forward, ns.cnct_backwrd) = _parse_connections(cnct)
+    end
+
     _scene = ns;
     projectinfo().scene_loaded = true
+    @info "Loaded scene: $(_scene.name)"
     return
 end
 
