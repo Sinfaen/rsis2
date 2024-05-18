@@ -1,5 +1,6 @@
 [scene]
-desc="unit test: single thread, two models"
+name="Sine Test"
+desc="Sine wave generator feeds another sine wave generator"
 engine="sim"
 stop= "2 minute"
 

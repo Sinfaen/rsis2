@@ -6,6 +6,7 @@ using ..Unitful
 
 export getscene, projectinfo, setproject, ProjectInfo
 export issceneloaded, newscene, newscene_args, loadscene
+export isprojectloaded, searchpath, addpath!, restorepath
 export ProjectType, Model, Container
 
 @enum ProjectType begin
@@ -24,11 +25,12 @@ mutable struct ProjectInfo
     # not printed to REPL
     scene_loaded::Bool
     autocode_path::String
+    paths::Vector{String} # file path system
     function ProjectInfo()
-        new(false, "", "", "", Model, false, "")
+        new(false, "", "", "", Model, false, "", ["."])
     end
     function ProjectInfo(l::Bool, d::String, n::String, d2::String, t::ProjectType, sl::Bool, ap::String)
-        new(l, d, n, d2, t, sl, ap)
+        new(l, d, n, d2, t, sl, ap, ["."])
     end
 end
 Base.show(io::IO, p::ProjectInfo) = print(io,
@@ -50,14 +52,15 @@ struct ModelCallback
     mod    :: String
     freq   :: Int # relative to thread frequency
     offset :: Int
+    spec   :: Float64 # scenario defined frequency
 end
 
 mutable struct ThreadInfo
-    name :: String
+    ind :: Int
     freq :: Float64
     schedule :: Vector{ModelCallback}
-    function ThreadInfo(name::String, f::Float64)
-        new(name, f, Vector{ModelCallback}())
+    function ThreadInfo(i::Int, f::Float64)
+        new(i, f, Vector{ModelCallback}())
     end
 end
 
@@ -65,16 +68,15 @@ mutable struct Scenario
     name :: String
     scheduler :: String
 
-    paths   :: Vector{String} # file path system
     threads :: Vector{ThreadInfo}
-    modules :: Vector{ModuleInfo} # model libraries
+    modules :: Set{String} # model libraries
 
     stoptime :: Float64 # seconds
     function Scenario()
-        new("", "", ["."], Vector{ThreadInfo}(), Vector{ModuleInfo}(), 0.0)
+        new("", "", Vector{ThreadInfo}(), Set{String}(), 0.0)
     end
     function Scenario(n::String, s::String)
-        new(n, s, ["."], Vector{ThreadInfo}(), Vector{ModuleInfo}(), 0.0)
+        new(n, s, Vector{ThreadInfo}(), Set{String}(), 0.0)
     end
 end
 
@@ -107,19 +109,29 @@ function setproject(p::ProjectInfo) :: Nothing
     return
 end
 
+"""
+    isprojectloaded()
+Returns boolean indicating a project has been loaded
+"""
+function isprojectloaded() :: Bool
+    return projectinfo().loaded
+end
+
 function addpath!(p::String) :: Nothing
-    if p in _scene.paths
+    if !isprojectloaded()
+        @error "No project loaded"
+    end
+    if p in projectinfo().paths
         @warn "Path $(p) already registered"
     else
-        push!(_scene.paths, p)
+        push!(projectinfo().paths, p)
     end
     return
 end
 
 function searchpath(path::String; all::Bool = false) :: Vector{String}
-    scene = getscene()
     paths = Vector{String}()
-    for p in scene.paths
+    for p in projectinfo().paths
         gp = joinpath(p, path)
         if isfile(gp)
             push!(paths, gp)
@@ -129,6 +141,13 @@ function searchpath(path::String; all::Bool = false) :: Vector{String}
         end
     end
     return paths
+end
+
+function restorepath() :: Nothing
+    if !isprojectloaded()
+        @error "No project loaded"
+    end
+    projectinfo().paths = Vector{String}()
 end
 
 function issceneloaded() :: Bool
@@ -156,12 +175,33 @@ function newscene(name::String = "", engine::String = "") :: Nothing
         name = String(strip(readline()))
     end
     if isempty(engine)
-        # TODO impelement check on OS
+        # TODO implement check on OS
         options = ["sim", "ubuntu"]
         menu = RadioMenu(options, pagesize=4)
         engine = options[request("Choose the scheduler:", menu)]
     end
     newscene_args(name, engine)
+end
+
+function _parse_scheduled(data::Dict) :: Tuple{String, ModelCallback}
+    for k in ["lib", "name", "freq"]
+        if !haskey(data, k)
+            @error "Schedule definition missing [$(k)]"
+        end
+    end
+    l = data["lib"]
+    if !isa(l, String)
+        @error "Scheduled model [lib] is not a string"
+    end
+    n = data["name"]
+    if !isa(n, String)
+        @error "Scheduled model [name] is not a string"
+    end
+    f = data["freq"]
+    if !isa(f, Real)
+        @error "Scheduled model [freq] is not a number"
+    end
+    return (l, ModelCallback(n, 1, 0, f))
 end
 
 function loadscene(name::String) :: Nothing
@@ -176,12 +216,13 @@ function loadscene(name::String) :: Nothing
 
     # check data is valid
     if !haskey(data, "scene")
-        throw(ErrorException("Missing [scene] table"))
+        @error "Missing [scene] table"
     end
     st = data["scene"]
     for key in ["name", "engine"]
         if !haskey(st, key)
-            throw(ErrorException("Missing [scene].$(key)"))
+            @error "Missing [scene].$(key)"
+            return
         end
     end
     ns = Scenario(st["name"], st["engine"])
@@ -194,20 +235,40 @@ function loadscene(name::String) :: Nothing
             txt = strip(st["stop"])
             toks = split(txt, " ")
             if length(toks) != 2
-                throw(ErrorException("stoptime parsing failed: $(toks)"))
+                @error "stoptime parsing failed: $(toks)"
             end
             try
                 val = parse(Float64, toks[1])
                 unit = uparse(toks[2])
                 ns.stoptime = ustrip(u"s", val * unit)
             catch e
-                throw(ErrorException("Parsing $(st["stop"]) > $(e)"))
+                @error "Parsing $(st["stop"]) > $(e)"
             end
         else
-            throw(ErrorException("stoptime is not a numeric: $(st["stop"])"))
+            @error "stoptime is not a numeric: $(st["stop"])"
         end
     end
+
+    if !haskey(data, "schedule")
+        @error "Missing [schedule] info"
+    end
+    sched = data["schedule"]
+    if typeof(sched) <: AbstractVector
+        # single thread
+        t = ThreadInfo(0, 0.0)
+        for s in sched
+            (libname, sinfo) = _parse_scheduled(s)
+            push!(ns.modules, libname)
+            push!(t.schedule, sinfo)
+        end
+        push!(ns.threads, t)
+    else
+        @error "multi-threaded scenarios not supported yet"
+        return
+    end
+
     _scene = ns;
+    projectinfo().scene_loaded = true
     return
 end
 

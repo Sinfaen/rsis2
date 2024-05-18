@@ -2,9 +2,9 @@
 name = "sine"
 desc = "Model that produces a discrete sine wave"
 version = "0.0.1"
-
-[scenes]
-base = "scenes/base.toml"
+filepaths = [
+    "scenes"
+]
 
 [cargo]
 path = "Cargo.toml"

@@ -3,20 +3,8 @@ module project
 using ..TOML
 using ..scenario
 
-export isprojectloaded, getprojectdirectory, loadproject, unloadproject
+export loadproject, unloadproject
 export generate_interface, compile_model
-
-"""
-    isprojectloaded()
-Returns boolean indicating a project has been loaded
-"""
-function isprojectloaded() :: Bool
-    return projectinfo().loaded
-end
-
-function getprojectdirectory() :: String
-    return projectinfo().directory
-end
 
 
 """
@@ -53,6 +41,16 @@ function loadproject(directory::String = ".") :: Nothing
     setproject(ProjectInfo(true, _dir, projectdata["rsisproject"]["name"],
         haskey(dat, "desc") ? dat["desc"] : "",
         ptype, false, autocode_path))
+    
+    if haskey(dat, "filepaths")
+        fp = dat["filepaths"]
+        if !(typeof(fp) <: AbstractArray)
+            @error "[rsisproject].filepaths is not an array type"
+        end
+        for f in fp
+            addpath!(f)
+        end
+    end
     @info "Loaded RSIS project at $(projectinfo().directory)"
 end
 

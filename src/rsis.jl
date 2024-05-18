@@ -16,6 +16,7 @@ using DataFrames
 include("scenario.jl")
 using .scenario
 export projectinfo, issceneloaded, newscene, newscene_args, loadscene
+export searchpath
 
 include("project.jl")
 using .project
